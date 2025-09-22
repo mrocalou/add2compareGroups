@@ -1,0 +1,299 @@
+---
+title: "add2compareGroups 0.1.0: Add adjustes OR/HR to compareGroups tables"
+author: "Mireia Roca Loureiro"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{add2compareGroups 0.1.0: Add adjustes OR/HR to compareGroups tables}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, echo = FALSE}
+library(knitr)
+library(kableExtra)
+library(compareGroups)
+library(ggplot2)
+library(gridExtra)
+library(add2compareGroups)
+```
+
+
+# Introduction
+
+The `add2compareGroups` package has been developed to extend the univariate descriptive tables provided by the `compareGroups` package (Subirana, Sanz, and Vila 2014). Ir allows users to add adjusted Odds Ratios (OR) and Hazard Ratios (HR) directly into those tables. This extension is expecially usefull in real-world data (RWD) settings where raw and adjusted association measures mend to be presented in the same report.
+
+Moreover, the package provides the ability to generate Forest Plot graphs for both, raw and adjusted OR/HR, facilitating their visual comparison and interpretation.
+
+This package is primarily aimed at researchers, data analysts and healthcare professionals who already use the `compareGroups` package and wish to quickly incorporate adjusted ratios without leaving their usual analysis and reporting workflow.
+
+The `add2compareGroups` package is available on GitHub. To install and load it, run the following commands:
+
+```{r, eval = FALSE, echo = TRUE}
+# Install from GitHub
+devtools::install_github("mrocalou/add2compareGroups")
+
+# Load the package
+library(add2compareGroups)
+```
+
+**Note**: You need to have the `devtools` package installed. If you don't have it, install it first with:
+
+```{r, eval = FALSE, echo = TRUE}
+install.packages("devtools")
+```
+
+
+This document provides an overview of the usage of the `add2compareGroups` package with real examples, based on the internal dataset `lung_patients` (provisional).
+
+
+# Package structure
+
+The `add2compareGroups` package has two functions:
+
+- `add_adjusted_ratio` adds adjusted OR or HR to a descriptive table previously created using the `compareGroups`package.
+
+- `ratio_forest_plot` generates Forest Plots to visualize unadjusted OR/HR when is provided with a `compareGroups`, `createTable` or `descrTable` and adjusted OR/HR when is provided with an object returned by `add_adjusted_ratio`.
+
+## Package data
+
+The example dataset of the package `lung_patients`, and used in this vignette, is a curated and semi-synthetic version of the original dataset from an oncology patient cohort, designed to support reproducible analysis in lung cancer research. It contains a selection of clinically relevant variables, including demographic, diagnostic and treatment collected from multiple centers.
+
+To ensure data usability and patient confidentiality, the dataset has been processed to remove redundant ambiguous or administrative variables. Also variables with low complete cases were excluded. 
+
+Synthetic values for sensitive entries were generated using the `synthpop` package, preserving multivariate relationships and statistical properties of the original data while avoiding disclosure risks. This makes the dataset suitable for training, method devolopment and illustrative purposes. 
+
+To load `lung_patients` data we type:
+
+
+```{r, eval = TRUE, echo = TRUE}
+data("lung_patients")
+```
+
+
+The varaibles we can find in this data frame are:
+
+```{r, eval = TRUE, echo = FALSE}
+definicions <- c(
+  PACIENT_ID    = "Unique patient code",
+  GENDER        = "Patient sex",
+  AGE           = "Age at diagnosis",
+  DEATH         = "Vital status at last follow-up",
+  SURV_MONTHS   = "Months from diagnosis to last follow-up or death",
+  SMOKING       = "Tabacco consumption status",
+  PACK_YEARS    = "Estimated cumulative tabacco exposure",
+  CHEMO         = "Chemotherapy administered",
+  RADIO         = "Radiotherapy administered",
+  ECOG_C        = "Performance status",
+  SURGERY       = "Whether the patient underwent surgery",
+  DISEASE_FREE  = "Free of disease at last assessment",
+  RECURRENCE    = "Evidence of recurrence",
+  PROGRESSION   = "Evidence of disease progression",
+  T_STAGE       = "Clinical T descriptor",
+  N_STAGE       = "Clinical N descriptor",
+  M_STAGE       = "Clinical M descriptor",
+  STAGE         = "Clinical stage at diagnosis",
+  SURG_INTENT   = "	Surgical intention"
+)
+
+
+
+info_vars <- names(lung_patients) |>
+  lapply(function(var_name) {
+    var <- lung_patients[[var_name]]
+    
+    list(
+      Variable = var_name,
+      Definicio = definicions[var_name],
+      Info = if (is.factor(var)) {
+        paste(levels(var), collapse = "; ")
+      } else if (is.numeric(var)) {
+        rng <- range(var, na.rm = TRUE)
+        paste0("[", rng[1], ", ", rng[2], "]")
+      } else {
+        "-"
+      }
+    )
+  }) |>
+  do.call(what = rbind.data.frame)
+
+
+```
+
+```{r, echo = FALSE, eval = TRUE, results='asis'}
+info_vars |>
+  kable("html", caption = "Variables information") |>
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+```
+
+
+
+# add_adjusted_ratio
+
+The `add_adjusted_ratio` function adds adjusted Odds Ratios or Hazard Ratios to descriptive tables previously generated using the compareGroups package. These adjusted estimates are useful for presenting statistical associations that account for potential confounding variables.
+
+The function is designed with user-friendliness in mind, providing detailed errors. When issues happen such as incompatible objects or invalid variables, error messages guide the user identifying and resolving the problem.
+
+During execution, the function also displays informative messages to indicate internal processes, such as which variables have no adjustment selected or which ones have been excluded due to redundancy.
+
+The output object is fully compatible with the export2md() function from the compareGroups package, enabling direct export of tables including the adjusted OR or HR to Markdown format, ideal for reporting purposes.
+
+
+Currently, the function only supports tables where the dependent variable is either a binary factor or a survival variable. 
+
+
+## Factor variable as dependent
+
+### Create the compareGroups object
+
+The basic object required to use the add_adjusted_ratio function is a compareGroups object, which has all the information for generating the descriptive tables with odds ratio when we pas it trough createTable function.
+
+To illustrate how this function works, we will create a simple object using some variables from the dataset included in this package. Function add_adjusted_ratio also accepts objects of class compareGroups or descrTable. It is recommended to start with an object generated with createTable, as it allows direct visualization of unadjusted Odds Ratio, making interpretation easier after ading the adjusted OR.
+
+For more information on creating and manipulating these objects, you can refer to the specific vignette of the compareGroups package [com referenciar?].
+
+
+```{r}
+cg_death <- compareGroups(DEATH ~ GENDER + AGE + SMOKING + PACK_YEARS + RECURRENCE,
+                          data = lung_patients)
+
+ct_death <- createTable(cg_death, show.ratio = TRUE)
+export2md(ct_death)
+```
+
+
+### Adjust with common vairables
+
+When you want to calculate adjusted odds ratios using the same set of confounding variables for all descriptive, you can use the adjust_common parameter. It accepts a character list specifying which variables should be used as covariates in all adjusted models.
+
+This approach is especially useful when prior studies or clinical knowledge indicate that specific variables are common confounders. For example, it is standard practice in many observational studies to adjust for age and sex, as these variables often influence the exposure and the outcome.By applying the same adjustment, you avoid redundant specification of confounders for each variable individually.
+
+```{r}
+OR_common <- add_adjusted_ratio(ct_death, adjust_common = list("AGE", "GENDER"))
+export2md(OR_common)
+```
+
+If we first look at the p-values, we can observe that none of them change in terms of statistical significance after adjustment. However, most of the OR show some variation compared to the unadjusted values.
+
+The most notable change happens in the variable SMOKING, where the OR values decrease in both cases (former smokers and current smokers). Particularly interesting is the group "Former smoker", where the OR pass from being greater than 1 (suggesting a risk factor) to less than 1, now indicating a protective factor after adjustment.
+
+This illustrates how adjusting for confounding variables can alter the interpretation of certain exposures.
+
+
+
+### Adjust each variable individually
+
+We can also adjust descriptive variables individually using the adjust parameter. This parameter is a list of lists, where each element has to take the name of the variable to be adjusted, and its content is a list of the variables by which we want to adjust it. These adjustment variables must exist in the dataframe, but they do not need to have been included in the initial table .
+
+In case both adjust_common and adjust are used at the same time, the adjust parameter will take priotity, since it allows for more specific and customized control than adjusting all variables using the same set. In such cases, this decision is notified to the user via a message.
+
+```{r}
+OR_individual <- add_adjusted_ratio(ct_death,
+                                    adjust_common = list("AGE", "GENDER"),
+                                    adjust = list("SMOKING" = list("PACK_YEARS", "PROGRESSION"),
+                                                  "RECURRENCE" = list("SURGERY"))
+)
+export2md(OR_individual)
+```
+
+In this case, we observe notable changes compared to the unadjusted analysis. Adjusting SMOKING by PACK_YEARS and PROGRESSION has altered the statistical significance of the categories: "Former smoker" now becomes significant after adjustment, while "Current smoker" loses its significanse. This suggest that part of its initial effects may have been confounded by these variables.
+
+Another relevant change is observed in RECURRENCE, which after being adjusted by SURGERY, becomes significant. 
+
+
+## Survival variable as dependent
+
+To analyze survival outcomes using the compareGroups package, is necessary to create a variable of class Surv. This combines the time-to-event and the indicator of whether the event occurred.
+
+```{r}
+library(survival)
+lung_patients$TIME_SURV_MONTHS <- with(lung_patients, Surv(SURV_MONTHS, DEATH == "Yes"))
+```
+
+The following prosses is going to be the same as in the previous example but with the survival variable as dependence. 
+
+### Create the compareGroups object
+
+```{r}
+cg_surv_months <- compareGroups(TIME_SURV_MONTHS ~ GENDER + AGE + SMOKING + PACK_YEARS + RECURRENCE,
+                                data = lung_patients)
+
+ct_surv_months <- createTable(cg_surv_months, show.ratio = TRUE)
+export2md(ct_surv_months)
+```
+
+### Adjust with common vairables
+
+
+```{r}
+HR_common <- add_adjusted_ratio(ct_surv_months, adjust_common = list("AGE", "GENDER"))
+export2md(HR_common)
+```
+
+In this case, only the p-value of AGE changes when adjusting for GENDER, shifting from statistically significant to non-significant
+
+
+
+
+### Adjust each variable individually
+
+```{r}
+HR_individual <- add_adjusted_ratio(ct_surv_months, adjust = list(
+  "PACK_YEARS" = list("SMOKING", "PROGRESSION"),
+  "RECURRENCE" = list("SURGERY")
+))
+export2md(HR_individual)
+```
+
+When we adjust PACK_YEARS, which showed no significant effect in the unadjusted model, by SMOKING and PROGRESSION, becomes statistically significant. 
+
+Regarding RECURRENCE, while it remains non-significant after adjustment by SURGERY, there is a shift in the direction of its effect from a protective factor to a risk factor. 
+
+# Forest plot
+
+The other function in the package is ratio_forest_plot, designed to generate Forest Plot that allows an intuitive visualization of OR and HR, both unadjusted and adjusted. When the input object is of class compareGroups or createTable, the function displays the unadjusted OR/HR. In contrast, if the object is a add_adjusted_ratio, the adjusted OR/HR are shown.
+
+This function aims to facilitate the comparative visualization of different ratios, complementing the descriptive tables previously generated, without the need for additional external calculations to obtain the values to be plotted. In this way, users can easily integrate tables and graphs into reports, maintaining the methodological and visual consistency of the results obtained with the package.
+
+To create the plot, the function includes two parameters that allow you to customize its appearance and improve interpretability. Using the scale_log argument, you can choose to display the X-axis (which shows the ratios values) on a logarithmic scale. Additionally, the hline_forest argument allows you to add a vertical reference line to the plot. This line helps easily identify OR/HR around a value. By default, the parameter takes the value 1, which represents the reference point where Odds Ratio and Hazard Ratio indicate no association.
+
+For this examples, we are going to use the createTable objects for bought examples and the individual adjusted.
+
+```{r multi-forest-plot-lineal, fig.show='hold', out.width='100%', fig.height=8, fig.width=14}
+grid.arrange(
+  grobs = list(
+    ratio_forest_plot(ct_death),
+    ratio_forest_plot(ct_death, log_scale = TRUE),
+    ratio_forest_plot(ct_surv_months, hline_forest_plot = NULL),
+    ratio_forest_plot(ct_surv_months, hline_forest_plot = NULL, log_scale = TRUE)
+    ),
+  top = "Comparison of Ratio Forest Plot with Raw OR/HR",
+  ncol = 2,
+)
+```
+
+
+```{r multi-forest-plot-log, fig.show='hold', out.width='100%', fig.height=8, fig.width=14}
+grid.arrange(
+  grobs = list(
+    ratio_forest_plot(OR_individual),
+    ratio_forest_plot(OR_individual, log_scale = TRUE),
+    ratio_forest_plot(HR_individual, hline_forest_plot = NULL),
+    ratio_forest_plot(HR_individual, hline_forest_plot = NULL, log_scale = TRUE)
+  ),
+  top = "Comparison of Ratio Forest Plot with adjusted OR/HR",
+  ncol = 2,
+)
+```
+
+# References {-}
+
+Vignette compareGroups
+
+
+
+
+
+
+
+

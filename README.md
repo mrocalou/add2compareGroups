@@ -1,0 +1,31 @@
+
+# add2compareGroups
+
+Extends the `compareGroups` package to seamlessly add adjusted **Odds
+Ratios (OR)** and **Hazard Ratios (HR)** into descriptive tables —
+perfect for real-world data analysis where raw and adjusted measures
+must coexist in reports. Also generates **Forest Plots** for visual
+comparison.
+
+🌱 **Work in progress!** We’re actively improving this package. Feedback
+and suggestions are welcome!
+
+## Installation
+
+Install the devolopment version from GitHub:
+
+``` r
+# install.packages("devtools")
+devtools::install_github("mrocalou/add2compareGroups")
+```
+
+## Full tutorial (vignette)
+
+All examples, use cases and detailed explanations are available in the
+package vignette. Once installed, run:
+
+``` r
+browseVignettes("add2compareGroups")
+```
+
+Or view it directly in RStudio’s Help pane after loading the package.

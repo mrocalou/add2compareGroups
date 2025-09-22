@@ -1,0 +1,29 @@
+Package: add2compareGroups
+Type: Package
+Title: Add adjusted OR/HR to compareGroups tables
+Version: 0.1.0
+Authors@R: 
+    person(given = "Mireia",
+           family = "Roca Loureiro",
+           email = "mireia.roca.data@gmail.com",
+           role = c("aut", "cre"))
+Description: The add2compareGroups package has been developed to extend the univariate descriptive tables provided by the compareGroups package (Subirana, Sanz, and Vila 2014). It allows users to add adjusted Odds Ratios (OR) and Hazard Ratios (HR) directly into those tables. This extension is especially useful in real-world data (RWD) settings where raw and adjusted association measures need to be presented in the same report.
+ Moreover, the package provides the ability to generate Forest Plot graphs for both raw and adjusted OR/HR, facilitating their visual comparison and interpretation.
+License: GPL-3
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 7.3.2
+Imports:
+    compareGroups,
+    ggplot2,
+    survival
+Suggests:
+    knitr,
+    rmarkdown,
+    gridExtra,
+    kableExtra,
+    testthat (>= 3.0.0)
+VignetteBuilder: knitr
+Config/testthat/edition: 3
+Depends: 
+    R (>= 3.5)
