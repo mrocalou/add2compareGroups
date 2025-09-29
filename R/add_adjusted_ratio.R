@@ -22,7 +22,7 @@ NULL
 #'
 #' @param show.n Logical. If TRUE, the number of observations used to compute each OR/HR estimate is displayed in the table.
 #'
-#' #' @param cor_test Logical. If TRUE, checks for multicollinearity among adjustment variables using VIF and excludes those with VIF > 5.
+#' @param cor_test Logical. If TRUE, checks for multicollinearity among adjustment variables using VIF and excludes those with VIF > 5.
 #'
 #'
 #' @return An updated object of class add_adjusted_ratio and createTable, generated from the input compare_object, that now includes additional columns with the adjusted OR/HR values and their associated statistics.
