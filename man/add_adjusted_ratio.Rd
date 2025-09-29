@@ -11,7 +11,8 @@ add_adjusted_ratio(
   show.ratio = TRUE,
   show.p.ratio = show.ratio,
   show.p.overall = TRUE,
-  show.n = FALSE
+  show.n = FALSE,
+  cor_test = TRUE
 )
 }
 \arguments{
@@ -27,7 +28,9 @@ add_adjusted_ratio(
 
 \item{show.p.overall}{Logical. If TRUE, the overall p-values for group significance ('p.overall' column) is displayed in the table.}
 
-\item{show.n}{Logical. If TRUE, the number of observations used to compute each OR/HR estimate is displayed in the table.}
+\item{show.n}{Logical. If TRUE, the number of observations used to compute each OR/HR estimate is displayed in the table.
+
+#' @param cor_test Logical. If TRUE, checks for multicollinearity among adjustment variables using VIF and excludes those with VIF > 5.}
 }
 \value{
 An updated object of class add_adjusted_ratio and createTable, generated from the input compare_object, that now includes additional columns with the adjusted OR/HR values and their associated statistics.

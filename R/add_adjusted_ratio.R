@@ -22,6 +22,8 @@ NULL
 #'
 #' @param show.n Logical. If TRUE, the number of observations used to compute each OR/HR estimate is displayed in the table.
 #'
+#' #' @param cor_test Logical. If TRUE, checks for multicollinearity among adjustment variables using VIF and excludes those with VIF > 5.
+#'
 #'
 #' @return An updated object of class add_adjusted_ratio and createTable, generated from the input compare_object, that now includes additional columns with the adjusted OR/HR values and their associated statistics.
 #'
@@ -64,7 +66,7 @@ NULL
 
 # Inici de la funció ----
 
-add_adjusted_ratio <- function(compare_object, adjust_common = NULL, adjust = NULL, show.ratio = TRUE, show.p.ratio = show.ratio, show.p.overall = TRUE, show.n = FALSE){
+add_adjusted_ratio <- function(compare_object, adjust_common = NULL, adjust = NULL, show.ratio = TRUE, show.p.ratio = show.ratio, show.p.overall = TRUE, show.n = FALSE, cor_test = TRUE){
 
   #////////////////////////////////////////////
 
@@ -264,7 +266,26 @@ add_adjusted_ratio <- function(compare_object, adjust_common = NULL, adjust = NU
     }
   } else {adjust_sort <- adjust}  ### Arnau Lagarda, el parentesis del else no és correcte, haurien de ser claudators {} 99
 
+  if (cor_test){
+    # Transformem totes les vairabels a numeric perquè la correlació serà igual i així podem calcular el VIF
+    data_VIF <- data.frame(suppressWarnings(lapply(data_util, as.numeric)))
 
+    for (var in names(adjust_sort)){
+      for (v_adj in unlist(adjust_sort[var])){
+
+        adj_formula <- as.formula(paste0(var, " ~ ", v_adj))
+        mod_lm <- lm(adj_formula, data = data_VIF)
+        smod <- summary(mod_lm)
+        r_mod <- (smod$r.squared)^2
+        VIF <- 1/(1-r_mod)
+
+        if (!is.na(VIF) && (VIF > 5 || VIF == "Inf")) {
+          adjust_sort[[var]] <- adjust_sort[[var]][unlist(adjust_sort[[var]]) != v_adj]
+          message(paste0("Removed '", v_adj, "' from '", var, "' adjustments due to high collinearity."))
+        }
+      }
+    }
+  }
 
 
   #////////////////////////////////////////////
@@ -365,9 +386,7 @@ add_adjusted_ratio <- function(compare_object, adjust_common = NULL, adjust = NU
 
         # calculem el p-overall
 
-        p_overall <- drop1(update(model_glm, data = model.frame(model_glm)), test= "Chisq") # ISAAC
-        ## Arnau Lagarda, potser seria més segur fer servir  p_overall[var_indep[i], "Pr(>Chi)"] en lloc
-        ## d'assumir la posició? 99
+        p_overall <- drop1(update(model_glm, data = model.frame(model_glm)), test= "Chisq")
 
         compare_object[[i]]$p.overall <- p_overall[var_indep[i],"Pr(>Chi)"]
 
@@ -549,8 +568,8 @@ add_adjusted_ratio <- function(compare_object, adjust_common = NULL, adjust = NU
                         "Adjusted" = createTable(compare_object,
                                                  show.ratio = show.ratio,
                                                  show.descr = FALSE,
-                                                 hide = attr(base, "hide"), # ISAAC
-                                                 hide.no = attr(base, "hide.no"), # ISAAC
+                                                 hide = attr(base, "hide"),
+                                                 hide.no = attr(base, "hide.no"),
                                                  show.n = show.n,
                                                  show.p.ratio = show.p.ratio,
                                                  show.p.overall = show.p.overall))
